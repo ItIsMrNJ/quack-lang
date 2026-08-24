@@ -1,4 +1,4 @@
-# Quack program language
+# Quack Lang
 <img src="GoldDuckIcon.png" style="width : 150px"> Quack Quack !1!
 
 ---
