@@ -1,5 +1,5 @@
 # quack-lang
-<img src="GoldDuckIcon.png">
+<img src="GoldDuckIcon.png" style="width : 150px">
 ---
 Quack Programming Language for GoldDuck ~ 🦆
 
