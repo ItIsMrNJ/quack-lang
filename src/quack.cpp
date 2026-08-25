@@ -19,6 +19,8 @@ static string tokenTypeName(enum type t)
     {
         case TOKEN_ID:              return "ID";
         case TOKEN_INT:             return "INT";
+        case TOKEN_FLOAT:           return "FLOAT";
+        case TOKEN_BOOL:            return "BOOL";
         case TOKEN_EQUALS:          return "EQUALS";
         case TOKEN_SEMICOLON:       return "SEMICOLON";
         case TOKEN_LEFT_PAREN:      return "LEFT_PAREN";

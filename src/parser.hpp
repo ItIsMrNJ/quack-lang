@@ -18,20 +18,26 @@ struct Function {
 };
 
 struct Value {
-    variant<int, string, bool, Function*> val;
+    variant<int, double, string, bool, Function*> val;
 
     bool isInt() const { return holds_alternative<int>(val); }
+    bool isFloat() const { return holds_alternative<double>(val); }
+    bool isNumber() const { return isInt() || isFloat(); }
     bool isString() const { return holds_alternative<string>(val); }
     bool isBool() const { return holds_alternative<bool>(val); }
     bool isFunc() const { return holds_alternative<Function*>(val); }
 
     int asInt() const { return get<int>(val); }
+    double asFloat() const { return get<double>(val); }
+    // Use when you just need a numeric value regardless of int/float.
+    double asNumber() const { return isInt() ? (double)get<int>(val) : get<double>(val); }
     string asString() const { return get<string>(val); }
     bool asBool() const { return get<bool>(val); }
     Function* asFunc() const { return get<Function*>(val); }
 
     void print() const {
         if (isInt()) cout << asInt() << endl;
+        else if (isFloat()) cout << asFloat() << endl;
         else if (isString()) cout << asString() << endl;
         else if (isBool()) cout << (asBool() ? "true" : "false") << endl;
         else if (isFunc()) cout << "<function>" << endl;
@@ -51,6 +57,8 @@ public:
     LiteralExpr(Token* t) : token(t) {}
     Value evaluate(map<string, Value>& variables) override {
         if (token->TYPE == TOKEN_INT) return Value{stoi(token->VALUE)};
+        if (token->TYPE == TOKEN_FLOAT) return Value{stod(token->VALUE)};
+        if (token->TYPE == TOKEN_BOOL) return Value{token->VALUE == "true"};
         if (token->TYPE == TOKEN_STRING) return Value{token->VALUE};
         if (token->TYPE == TOKEN_ID) {
             if (variables.count(token->VALUE)) return variables[token->VALUE];
@@ -75,28 +83,45 @@ public:
         Value rVal = right->evaluate(variables);
         
         if (op == TOKEN_EQUALS_EQUALS) {
-            if (lVal.isInt() && rVal.isInt()) return Value{lVal.asInt() == rVal.asInt()};
+            if (lVal.isNumber() && rVal.isNumber()) return Value{lVal.asNumber() == rVal.asNumber()};
             if (lVal.isString() && rVal.isString()) return Value{lVal.asString() == rVal.asString()};
             if (lVal.isBool() && rVal.isBool()) return Value{lVal.asBool() == rVal.asBool()};
             return Value{false};
         }
 
-        if (lVal.isInt() && rVal.isInt()) {
-            int lNum = lVal.asInt();
-            int rNum = rVal.asInt();
-            if (op == TOKEN_PLUS) return Value{lNum + rNum};
-            if (op == TOKEN_MINUS) return Value{lNum - rNum};
-            if (op == TOKEN_MULTIPLY) return Value{lNum * rNum};
-            if (op == TOKEN_DIVIDE) {
-                if (rNum == 0) { cout << "[RUNTIME ERROR] Division by zero." << endl; exit(1); }
-                return Value{lNum / rNum};
+        // Both sides numeric: if either side is a float, promote both to float.
+        if (lVal.isNumber() && rVal.isNumber()) {
+            if (lVal.isInt() && rVal.isInt()) {
+                int lNum = lVal.asInt();
+                int rNum = rVal.asInt();
+                if (op == TOKEN_PLUS) return Value{lNum + rNum};
+                if (op == TOKEN_MINUS) return Value{lNum - rNum};
+                if (op == TOKEN_MULTIPLY) return Value{lNum * rNum};
+                if (op == TOKEN_DIVIDE) {
+                    if (rNum == 0) { cout << "[RUNTIME ERROR] Division by zero." << endl; exit(1); }
+                    return Value{lNum / rNum};
+                }
+                if (op == TOKEN_LESS) return Value{lNum < rNum};
+                if (op == TOKEN_GREATER) return Value{lNum > rNum};
+                if (op == TOKEN_LESS_EQUALS) return Value{lNum <= rNum};
+                if (op == TOKEN_GREATER_EQUALS) return Value{lNum >= rNum};
+            } else {
+                double lNum = lVal.asNumber();
+                double rNum = rVal.asNumber();
+                if (op == TOKEN_PLUS) return Value{lNum + rNum};
+                if (op == TOKEN_MINUS) return Value{lNum - rNum};
+                if (op == TOKEN_MULTIPLY) return Value{lNum * rNum};
+                if (op == TOKEN_DIVIDE) {
+                    if (rNum == 0.0) { cout << "[RUNTIME ERROR] Division by zero." << endl; exit(1); }
+                    return Value{lNum / rNum};
+                }
+                if (op == TOKEN_LESS) return Value{lNum < rNum};
+                if (op == TOKEN_GREATER) return Value{lNum > rNum};
+                if (op == TOKEN_LESS_EQUALS) return Value{lNum <= rNum};
+                if (op == TOKEN_GREATER_EQUALS) return Value{lNum >= rNum};
             }
-            if (op == TOKEN_LESS) return Value{lNum < rNum};
-            if (op == TOKEN_GREATER) return Value{lNum > rNum};
-            if (op == TOKEN_LESS_EQUALS) return Value{lNum <= rNum};
-            if (op == TOKEN_GREATER_EQUALS) return Value{lNum >= rNum};
         }
-        
+
         if (lVal.isString() && rVal.isString() && op == TOKEN_PLUS) {
             return Value{lVal.asString() + rVal.asString()};
         }
@@ -218,7 +243,7 @@ public:
     ~IfStmt() { delete condition; delete thenBranch; if (elseBranch) delete elseBranch; }
     void execute(map<string, Value>& variables) override {
         Value condVal = condition->evaluate(variables);
-        if ((condVal.isBool() && condVal.asBool()) || (condVal.isInt() && condVal.asInt() != 0)) {
+        if ((condVal.isBool() && condVal.asBool()) || (condVal.isNumber() && condVal.asNumber() != 0)) {
             thenBranch->execute(variables);
         } else if (elseBranch) {
             elseBranch->execute(variables);
@@ -296,7 +321,8 @@ private:
             consumeValue(")", "Expected ')'");
             return new CallExpr(name, args);
         }
-        if (token && (token->TYPE == TOKEN_INT || token->TYPE == TOKEN_STRING || token->TYPE == TOKEN_ID)) {
+        if (token && (token->TYPE == TOKEN_INT || token->TYPE == TOKEN_FLOAT || token->TYPE == TOKEN_BOOL ||
+                      token->TYPE == TOKEN_STRING || token->TYPE == TOKEN_ID)) {
             advance();
             return new LiteralExpr(token);
         }

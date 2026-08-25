@@ -12,6 +12,8 @@ enum type
 {
     TOKEN_ID,
     TOKEN_INT,
+    TOKEN_FLOAT,
+    TOKEN_BOOL,
     TOKEN_EQUALS,
     TOKEN_SEMICOLON,
     TOKEN_LEFT_PAREN,
@@ -84,9 +86,18 @@ public:
             advance();
         }
 
+        string word = buffer.str();
+
         Token * newToken = new Token();
-        newToken -> TYPE = TOKEN_ID;
-        newToken -> VALUE = buffer.str();
+        if (word == "true" || word == "false")
+        {
+            newToken -> TYPE = TOKEN_BOOL;
+        }
+        else
+        {
+            newToken -> TYPE = TOKEN_ID;
+        }
+        newToken -> VALUE = word;
 
         return newToken;
     }
@@ -125,14 +136,31 @@ public:
     Token *tokenizeINT()
     {
         stringstream buffer;
+        bool isFloat = false;
+
         while(isdigit(current))
         {
             buffer << current;
             advance();
         }
-        
+
+        // A '.' followed by a digit turns this into a float literal.
+        // A '.' NOT followed by a digit is left alone (not consumed here),
+        // so it can't accidentally swallow something else later.
+        if (current == '.' && cursor + 1 < size && isdigit(source[cursor + 1]))
+        {
+            isFloat = true;
+            buffer << current;
+            advance();
+            while (isdigit(current))
+            {
+                buffer << current;
+                advance();
+            }
+        }
+
         Token * newToken = new Token();
-        newToken -> TYPE = TOKEN_INT;
+        newToken -> TYPE = isFloat ? TOKEN_FLOAT : TOKEN_INT;
         newToken -> VALUE = buffer.str();
 
         return newToken;
