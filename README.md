@@ -5,8 +5,6 @@
 
 ### Quack is the programming language developed for the GoldDuck Engine.
 
-Please wait for building this repo...
-
 ## Quick Start
 
 Clone the repo:
