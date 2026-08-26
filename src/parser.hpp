@@ -44,6 +44,12 @@ struct Value {
     }
 };
 
+// Thrown by ReturnStmt::execute to unwind the call stack back up to the
+// CallExpr that invoked the current function, carrying the returned value.
+struct ReturnSignal {
+    Value value;
+};
+
 class Expr {
 public:
     virtual ~Expr() {}
@@ -180,9 +186,15 @@ Value CallExpr::evaluate(map<string, Value>& variables) {
     for (size_t i = 0; i < arguments.size(); i++) {
         localVars[func->params[i]] = arguments[i]->evaluate(variables);
     }
-    for (Stmt* stmt : func->body) {
-        if (stmt) stmt->execute(localVars);
+    try {
+        for (Stmt* stmt : func->body) {
+            if (stmt) stmt->execute(localVars);
+        }
+    } catch (ReturnSignal& ret) {
+        return ret.value;
     }
+    // No `return` was hit -- fall through with a default value,
+    // same as before this function had `return` support.
     return Value{0};
 }
 
@@ -230,6 +242,23 @@ public:
     ~QuackStmt() { delete expression; }
     void execute(map<string, Value>& variables) override {
         expression->evaluate(variables).print();
+    }
+};
+
+// `return;` has expression == nullptr and returns Value{0}.
+// `return <expr>;` evaluates the expression and returns that.
+// Either way, execute() throws to unwind back up to the CallExpr that
+// invoked this function -- that's how the value escapes nested
+// if/for blocks without every Stmt needing to know about returns.
+class ReturnStmt : public Stmt {
+private:
+    Expr* expression;
+public:
+    ReturnStmt(Expr* expr) : expression(expr) {}
+    ~ReturnStmt() { if (expression) delete expression; }
+    void execute(map<string, Value>& variables) override {
+        Value val = expression ? expression->evaluate(variables) : Value{0};
+        throw ReturnSignal{val};
     }
 };
 
@@ -411,6 +440,7 @@ public:
         if (token->VALUE == "if") return parseIf();
         if (token->VALUE == "for") return parseFor();
         if (token->VALUE == "fun") return parseFun();
+        if (token->VALUE == "return") return parseReturn();
         
         Expr* expr = parseExpression();
         consume(TOKEN_SEMICOLON, "Expected ';'");
@@ -487,6 +517,17 @@ public:
         vector<Stmt*> body = parseBlock();
         return new FunStmt(nameToken->VALUE, params, body);
     }
+
+    Stmt* parseReturn() {
+        consumeValue("return", "Expected 'return'");
+        Expr* expr = nullptr;
+        // Allow a bare "return;" with no value.
+        if (peek() && peek()->VALUE != ";") {
+            expr = parseExpression();
+        }
+        consume(TOKEN_SEMICOLON, "Expected ';' after return statement.");
+        return new ReturnStmt(expr);
+    }
 };
 
 class Interpreter {
@@ -494,8 +535,13 @@ private:
     map<string, Value> variables;
 public:
     void interpret(const vector<Stmt*>& programAST) {
-        for (Stmt* stmt : programAST) {
-            if (stmt) stmt->execute(variables);
+        try {
+            for (Stmt* stmt : programAST) {
+                if (stmt) stmt->execute(variables);
+            }
+        } catch (ReturnSignal&) {
+            cout << "[RUNTIME ERROR] 'return' used outside of a function." << endl;
+            exit(1);
         }
     }
 };
