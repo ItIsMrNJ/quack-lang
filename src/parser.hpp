@@ -441,6 +441,7 @@ public:
         if (token->VALUE == "for") return parseFor();
         if (token->VALUE == "fun") return parseFun();
         if (token->VALUE == "return") return parseReturn();
+        if (token->VALUE == "gin") return parseGin();
         
         Expr* expr = parseExpression();
         consume(TOKEN_SEMICOLON, "Expected ';'");
@@ -527,6 +528,12 @@ public:
         }
         consume(TOKEN_SEMICOLON, "Expected ';' after return statement.");
         return new ReturnStmt(expr);
+    }
+
+    // i will make it
+    Stmt* parseGin()
+    {
+
     }
 };
 

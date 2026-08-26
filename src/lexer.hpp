@@ -68,9 +68,23 @@ public:
 
     void checkAndSkips()
     {
-        while (cursor < size && (current == ' ' || current == '\t' || current == '\r' || current == '\n'))
+        while (cursor < size)
         {
-            advance();
+            if (current == ' ' || current == '\t' || current == '\r' || current == '\n')
+            {
+                advance();
+                continue;
+            }
+            // Line comment: "// ..." runs to the end of the line (or EOF).
+            if (current == '/' && cursor + 1 < size && source[cursor + 1] == '/')
+            {
+                while (cursor < size && current != '\n')
+                {
+                    advance();
+                }
+                continue;
+            }
+            break;
         }
     }
 
