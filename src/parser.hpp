@@ -29,7 +29,6 @@ struct Value {
 
     int asInt() const { return get<int>(val); }
     double asFloat() const { return get<double>(val); }
-    // Use when you just need a numeric value regardless of int/float.
     double asNumber() const { return isInt() ? (double)get<int>(val) : get<double>(val); }
     string asString() const { return get<string>(val); }
     bool asBool() const { return get<bool>(val); }
@@ -44,8 +43,6 @@ struct Value {
     }
 };
 
-// Thrown by ReturnStmt::execute to unwind the call stack back up to the
-// CallExpr that invoked the current function, carrying the returned value.
 struct ReturnSignal {
     Value value;
 };
@@ -95,7 +92,6 @@ public:
             return Value{false};
         }
 
-        // Both sides numeric: if either side is a float, promote both to float.
         if (lVal.isNumber() && rVal.isNumber()) {
             if (lVal.isInt() && rVal.isInt()) {
                 int lNum = lVal.asInt();
@@ -193,8 +189,6 @@ Value CallExpr::evaluate(map<string, Value>& variables) {
     } catch (ReturnSignal& ret) {
         return ret.value;
     }
-    // No `return` was hit -- fall through with a default value,
-    // same as before this function had `return` support.
     return Value{0};
 }
 
@@ -245,11 +239,6 @@ public:
     }
 };
 
-// `return;` has expression == nullptr and returns Value{0}.
-// `return <expr>;` evaluates the expression and returns that.
-// Either way, execute() throws to unwind back up to the CallExpr that
-// invoked this function -- that's how the value escapes nested
-// if/for blocks without every Stmt needing to know about returns.
 class ReturnStmt : public Stmt {
 private:
     Expr* expression;
@@ -311,6 +300,41 @@ public:
     void execute(map<string, Value>& variables) override {
         Function* func = new Function{params, body};
         variables[name] = Value{func};
+    }
+};
+
+// gin(varName); reads a line from stdin and stores it into an
+// ALREADY-EXISTING variable, guessing int -> float -> bool -> string.
+class GinStmt : public Stmt {
+private:
+    string varName;
+public:
+    GinStmt(string name) : varName(name) {}
+    void execute(map<string, Value>& variables) override {
+        if (!variables.count(varName)) {
+            cout << "[RUNTIME ERROR] Undefined variable '" << varName << "'" << endl;
+            exit(1);
+        }
+
+        string line;
+        getline(cin, line);
+
+        try {
+            size_t idx;
+            int i = stoi(line, &idx);
+            if (idx == line.size()) { variables[varName] = Value{i}; return; }
+        } catch (...) {}
+
+        try {
+            size_t idx;
+            double d = stod(line, &idx);
+            if (idx == line.size()) { variables[varName] = Value{d}; return; }
+        } catch (...) {}
+
+        if (line == "true")  { variables[varName] = Value{true};  return; }
+        if (line == "false") { variables[varName] = Value{false}; return; }
+
+        variables[varName] = Value{line};
     }
 };
 
@@ -522,7 +546,6 @@ public:
     Stmt* parseReturn() {
         consumeValue("return", "Expected 'return'");
         Expr* expr = nullptr;
-        // Allow a bare "return;" with no value.
         if (peek() && peek()->VALUE != ";") {
             expr = parseExpression();
         }
@@ -530,10 +553,13 @@ public:
         return new ReturnStmt(expr);
     }
 
-    // i will make it
-    Stmt* parseGin()
-    {
-
+    Stmt* parseGin() {
+        consumeValue("gin", "Expected 'gin'");
+        consumeValue("(", "Expected '('.");
+        Token* varToken = consume(TOKEN_ID, "Expected variable name.");
+        consumeValue(")", "Expected ')'.");
+        consume(TOKEN_SEMICOLON, "Expected ';'.");
+        return new GinStmt(varToken->VALUE);
     }
 };
 
