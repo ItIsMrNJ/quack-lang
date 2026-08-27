@@ -34,12 +34,14 @@ struct Value {
     bool asBool() const { return get<bool>(val); }
     Function* asFunc() const { return get<Function*>(val); }
 
+    // No automatic newline here on purpose -- if you want a line break,
+    // put \n inside the quack(...) string yourself.
     void print() const {
-        if (isInt()) cout << asInt() << endl;
-        else if (isFloat()) cout << asFloat() << endl;
-        else if (isString()) cout << asString() << endl;
-        else if (isBool()) cout << (asBool() ? "true" : "false") << endl;
-        else if (isFunc()) cout << "<function>" << endl;
+        if (isInt()) cout << asInt();
+        else if (isFloat()) cout << asFloat();
+        else if (isString()) cout << asString();
+        else if (isBool()) cout << (asBool() ? "true" : "false");
+        else if (isFunc()) cout << "<function>";
     }
 };
 

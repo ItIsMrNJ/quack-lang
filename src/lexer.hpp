@@ -123,6 +123,26 @@ public:
 
         while (current != '"' && current != '\0')
         {
+            // Backslash escape: \n, \t, \r, \", \\, \0
+            if (current == '\\' && cursor + 1 < size)
+            {
+                advance(); // consume the backslash, `current` now holds the escape letter
+                switch (current)
+                {
+                    case 'n':  buffer << '\n'; break;
+                    case 't':  buffer << '\t'; break;
+                    case 'r':  buffer << '\r'; break;
+                    case '"':  buffer << '"';  break;
+                    case '\\': buffer << '\\'; break;
+                    case '0':  buffer << '\0'; break;
+                    // Unknown escape: keep both characters as-is rather than
+                    // silently eating one of them.
+                    default:   buffer << '\\' << current; break;
+                }
+                advance();
+                continue;
+            }
+
             buffer << current;
             advance();
         }
